@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         WTA Module: Video Downloader (Power Fix)
+// @name         WTA Module: Video Downloader (Visual Progress v3.3)
 // @namespace    http://tampermonkey.net/
-// @version      3.2
-// @description  Met Sandbox-bridge (unsafeWindow) fix
+// @version      3.3
+// @description  Met live voortgangsbalk en bestandsgrootte weergave
 // @match        *://*/*
 // @grant        GM_download
 // @grant        GM_info
@@ -12,17 +12,12 @@
 (function() {
     'use strict';
 
-    // BRUG NAAR DE PAGINA
-    // Omdat we in een 'sandbox' zitten, moeten we functies aan 'unsafeWindow' hangen
-    // zodat de knoppen op de pagina ze kunnen vinden.
     const pageWindow = unsafeWindow;
 
     function waitForCore() {
-        // We checken zowel de sandbox als de pageWindow voor de zekerheid
         if (typeof unsafeWindow.__WTA_MODULE_UI__ !== 'undefined') {
             registerModule();
         } else if (typeof window.__WTA_MODULE_UI__ !== 'undefined') {
-             // Soms lekt hij toch door
              registerModule();
         } else {
             setTimeout(waitForCore, 200);
@@ -34,7 +29,7 @@
 
     const I18N = {
         nl: {
-            name: 'Video Downloader (Power)',
+            name: 'Video Downloader (Visual)',
             noVideos: 'Geen video\'s gevonden',
             detected: '{0} video(s) gevonden',
             video: 'Video',
@@ -49,14 +44,17 @@
             toastRecSave: 'Video opgeslagen!',
             toastLinkCopied: 'Link gekopieerd',
             toastErr: 'Fout bij starten opname',
-            toastDlStart: 'Download gestart...',
+            toastDlStart: 'Download initialiseren...',
             toastDlSuccess: 'Download voltooid!',
-            toastDlFail: 'GM Download mislukt (Zie Console F12)',
+            toastDlFail: 'Download mislukt. Check console.',
             statusRec: '🔴 Opnemen...',
-            manualTip: '⚠️ Klik rechts op de video -> Opslaan als'
+            manualTip: '⚠️ Klik rechts op de video -> Opslaan als',
+            progress: 'Bezig: {0}% ({1})',
+            progressUnknown: 'Bezig: {0} gedownload...',
+            fallback: 'Power mislukt, openen in nieuw tabblad...'
         },
         en: {
-            name: 'Video Downloader (Power)',
+            name: 'Video Downloader (Visual)',
             noVideos: 'No videos detected',
             detected: '{0} video(s) detected',
             video: 'Video',
@@ -71,11 +69,14 @@
             toastRecSave: 'Video saved!',
             toastLinkCopied: 'Link copied',
             toastErr: 'Error starting record',
-            toastDlStart: 'Download started...',
+            toastDlStart: 'Initializing download...',
             toastDlSuccess: 'Download complete!',
-            toastDlFail: 'GM Download failed (Check Console F12)',
+            toastDlFail: 'Download failed. Check console.',
             statusRec: '🔴 Recording...',
-            manualTip: '⚠️ Right click video -> Save Video As'
+            manualTip: '⚠️ Right click video -> Save Video As',
+            progress: 'Downloading: {0}% ({1})',
+            progressUnknown: 'Downloading: {0} received...',
+            fallback: 'Power failed, opening in new tab...'
         }
     };
     const T = I18N[LANG];
@@ -90,6 +91,15 @@
     let currentRecordingIndex = -1;
     let activeStream = null;
 
+    // Helper: Bytes naar leesbare tekst (MB/KB)
+    function formatBytes(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
     function formatTime(ms) {
         const totalSeconds = Math.floor(ms / 1000);
         const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
@@ -99,7 +109,6 @@
 
     function detectVideos() {
         videos = [];
-        // We zoeken in de echte DOM
         document.querySelectorAll('video').forEach((v, i) => {
             let src = v.currentSrc || v.src || v.querySelector('source')?.src;
             const isBlob = src && (src.startsWith('blob:') || src.includes('.m3u8'));
@@ -115,13 +124,20 @@
 
     // --- DOWNLOAD FUNCTIES ---
 
-    // LET OP: We gebruiken nu 'pageWindow' ipv 'window'
     pageWindow.__wtaDownloadFile = function(index) {
         const v = videos[index];
         if (!v || !v.src) return;
 
         showToast(T.toastDlStart);
-        console.log('[PowerDL] Start download voor:', v.src);
+        
+        // Reset en toon progress bar in UI
+        const statusEl = document.getElementById(`wta-status-${index}`);
+        const barEl = document.getElementById(`wta-bar-${index}`);
+        const barContainer = document.getElementById(`wta-bar-container-${index}`);
+        
+        if (barContainer) barContainer.style.display = 'block';
+        if (barEl) barEl.style.width = '0%';
+        if (statusEl) statusEl.innerText = 'Start...';
 
         const fileName = `video_${Date.now()}.mp4`;
 
@@ -129,21 +145,40 @@
             GM_download({
                 url: v.src,
                 name: fileName,
-                saveAs: true,
+                saveAs: true, // Vraagt waar op te slaan (werkt vaak beter)
                 headers: {
                     'Referer': window.location.href,
                     'User-Agent': navigator.userAgent
                 },
                 onload: () => {
-                    console.log('[PowerDL] Succes!');
+                    if (statusEl) statusEl.innerText = '✅ Klaar!';
+                    if (barEl) barEl.style.width = '100%';
+                    if (barEl) barEl.style.backgroundColor = '#10b981';
                     showToast(T.toastDlSuccess);
                 },
+                onprogress: (progress) => {
+                    // Update de balk!
+                    if (progress.lengthComputable) {
+                        const percent = Math.floor((progress.loaded / progress.total) * 100);
+                        if (barEl) barEl.style.width = percent + '%';
+                        if (statusEl) statusEl.innerText = `${percent}% (${formatBytes(progress.loaded)})`;
+                    } else {
+                        // Geen totaalgrootte bekend
+                        if (barEl) barEl.style.width = '100%';
+                        if (barEl) barEl.style.animation = 'pulse 1s infinite'; // Laat zien dat hij leeft
+                        if (statusEl) statusEl.innerText = `${formatBytes(progress.loaded)}...`;
+                    }
+                },
                 onerror: (err) => {
-                    console.error('[PowerDL] FOUT:', err);
+                    console.error('[PowerDL] Error:', err);
+                    if (statusEl) statusEl.innerText = '❌ Fout!';
+                    
                     let msg = T.toastDlFail;
-                    if (err.error === 'not_permitted') msg = 'Geen toestemming (Check Tampermonkey)';
+                    if (err.error === 'not_permitted') msg = '⚠️ Geen rechten! Check Tampermonkey settings.';
                     showToast(msg);
-                    setTimeout(() => fallbackDownload(v.src), 1500);
+                    
+                    // Fallback na 2 seconden
+                    setTimeout(() => fallbackDownload(v.src), 2000);
                 }
             });
         } else {
@@ -152,47 +187,34 @@
     };
 
     function fallbackDownload(src) {
+        showToast(T.fallback);
         window.open(src, '_blank');
         alert(T.manualTip);
     }
 
-    // --- OPNEEM FUNCTIES ---
-
+    // --- OPNEEM FUNCTIES (Ongewijzigd) ---
+    // ... (Zelfde logica als v3.2, ingekort voor leesbaarheid hier) ...
+    
     pageWindow.__wtaStartRecord = function(index) {
         const v = videos[index];
         if (!v || !v.el) return;
-
         try {
             const stream = v.el.captureStream ? v.el.captureStream() : v.el.mozCaptureStream();
             if (!stream) { alert('Capture niet ondersteund'); return; }
-
-            activeStream = stream;
-            recordedChunks = [];
-
+            activeStream = stream; recordedChunks = [];
             let options = { mimeType: 'video/webm;codecs=vp9' };
             if (!MediaRecorder.isTypeSupported(options.mimeType)) options = { mimeType: 'video/webm' };
-
             mediaRecorder = new MediaRecorder(stream, options);
             mediaRecorder.ondataavailable = function(e) { if (e.data.size > 0) recordedChunks.push(e.data); };
             mediaRecorder.onstop = function() { saveRecording(); };
-
-            mediaRecorder.start(1000);
-            currentRecordingIndex = index;
-            recordingStartTime = Date.now();
-
+            mediaRecorder.start(1000); 
+            currentRecordingIndex = index; recordingStartTime = Date.now();
             recordingInterval = setInterval(() => {
                 const timerEl = document.getElementById(`wta-rec-timer-${index}`);
                 if (timerEl) timerEl.innerText = T.statusRec + ' ' + formatTime(Date.now() - recordingStartTime);
             }, 1000);
-
-            v.el.play();
-            updatePanel();
-            showToast(T.toastRecStart);
-
-        } catch (e) {
-            console.error(e);
-            showToast(T.toastErr);
-        }
+            v.el.play(); updatePanel(); showToast(T.toastRecStart);
+        } catch (e) { console.error(e); showToast(T.toastErr); }
     };
 
     pageWindow.__wtaStopRecord = function(index) {
@@ -207,33 +229,20 @@
         currentRecordingIndex = -1;
         const blob = new Blob(recordedChunks, { type: 'video/webm' });
         const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `opname_${Date.now()}.webm`;
-        document.body.appendChild(a);
-        a.click();
+        const a = document.createElement('a'); a.href = url; a.download = `opname_${Date.now()}.webm`;
+        document.body.appendChild(a); a.click();
         setTimeout(() => { document.body.removeChild(a); window.URL.revokeObjectURL(url); }, 100);
-        showToast(T.toastRecSave);
-        updatePanel();
+        showToast(T.toastRecSave); updatePanel();
     }
 
     pageWindow.__wtaCopyLink = function(text) {
-        navigator.clipboard.writeText(text).then(() => {
-            showToast(T.toastLinkCopied);
-        });
+        navigator.clipboard.writeText(text).then(() => { showToast(T.toastLinkCopied); });
     };
 
-    // --- Helpers voor UI communicatie ---
-    // Omdat we in sandbox zitten, moeten we via unsafeWindow praten met de Core UI
-    function showToast(msg) {
-        if (pageWindow.__WTA_MODULE_UI__) pageWindow.__WTA_MODULE_UI__.toast(msg);
-    }
+    function showToast(msg) { if (pageWindow.__WTA_MODULE_UI__) pageWindow.__WTA_MODULE_UI__.toast(msg); }
+    function updatePanel() { if (pageWindow.__WTA_MODULE_UI__) pageWindow.__WTA_MODULE_UI__.updatePanel(MODULE.id, getPanelHtml()); }
 
-    function updatePanel() {
-        if (pageWindow.__WTA_MODULE_UI__) pageWindow.__WTA_MODULE_UI__.updatePanel(MODULE.id, getPanelHtml());
-    }
-
-    // --- GUI ---
+    // --- GUI (Met Progress Bar!) ---
     function getPanelHtml() {
         detectVideos();
         if (videos.length === 0) return `<div style="text-align:center;padding:30px;color:#9ca3af"><div style="font-size:40px;margin-bottom:10px">🕵️</div><div>${T.noVideos}</div></div>`;
@@ -243,7 +252,7 @@
         videos.forEach((v, i) => {
             const isRecording = (currentRecordingIndex === i);
             const res = (v.w && v.h) ? `${v.w}x${v.h}` : T.resUnknown;
-
+            
             html += `<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:12px;margin-bottom:12px">
                 <div style="display:flex;gap:10px;margin-bottom:8px">
                     <div style="width:40px;height:40px;background:#e0e7ff;color:#6366f1;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px">🎬</div>
@@ -252,7 +261,8 @@
                         <div style="font-size:11px;color:#9ca3af">${res} • ${v.isBlob ? T.typeBlob : T.typeFile}</div>
                     </div>
                 </div>
-                <div style="display:flex;gap:8px;flex-wrap:wrap">`;
+                
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">`;
 
             if (v.isBlob) {
                 if (isRecording) {
@@ -263,9 +273,16 @@
             } else {
                 html += `<button onclick="__wtaDownloadFile(${i})" style="flex:1;background:#667eea;color:white;border:none;padding:8px;border-radius:6px;cursor:pointer">${T.download}</button>`;
             }
-
             if (v.src) html += `<button onclick="__wtaCopyLink('${v.src}')" title="${T.copyLink}" style="width:36px;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;cursor:pointer">🔗</button>`;
             html += `</div>`;
+
+            // PROGRESS BAR SECTIE
+            html += `
+            <div id="wta-bar-container-${i}" style="display:none;margin-top:8px;background:#e5e7eb;height:6px;border-radius:3px;overflow:hidden">
+                <div id="wta-bar-${i}" style="width:0%;height:100%;background:#6366f1;transition:width 0.3s"></div>
+            </div>
+            <div id="wta-status-${i}" style="font-size:10px;color:#6b7280;margin-top:4px;text-align:right;height:14px"></div>
+            `;
 
             if (isRecording) {
                 html += `<div id="wta-rec-timer-${i}" style="margin-top:8px;text-align:center;color:#ef4444;font-weight:bold;font-size:13px">${T.statusRec} 00:00</div>`;
@@ -276,12 +293,11 @@
         return html;
     }
 
-    function registerModule() {
-        // Registreer via pageWindow, want daar draait de Core
+    function registerModule() { 
         if (pageWindow.__WTA_MODULE_UI__) {
             pageWindow.__WTA_MODULE_UI__.register({ ...MODULE, onAction: (c) => { c.innerHTML = getPanelHtml(); } });
         }
     }
-
+    
     waitForCore();
 })();
