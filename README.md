@@ -1,45 +1,45 @@
 🛠️ UserScripts Collection
 
-Een persoonlijke verzameling van Tampermonkey / Greasemonkey scripts om de surfervaring te verbeteren, privacy te waarborgen en media te downloaden.
-🚀 Installatie
+A personal collection of Tampermonkey / Greasemonkey scripts designed to enhance browsing experience, ensure privacy, and streamline media downloads.
+🚀 Installation
 
-    Installeer een userscript manager zoals Tampermonkey.
+    Install a userscript manager such as Tampermonkey.
 
-    Klik op de bestandsnaam van een script in de lijst hierboven.
+    Click on the filename of a script in the list above.
 
-    Klik op de knop "Raw".
+    Click the "Raw" button.
 
-    Je script-manager herkent het script en vraagt om bevestiging voor de installatie.
+    Your script manager will detect the script and prompt you to confirm the installation.
 
-📂 Beschikbare Scripts
+📂 Available Scripts
 📺 Video & Media
-Script	Omschrijving
-Video-downloader.js	Download video's van diverse platformen. Bevat nu een handige progress bar.
-Stream-sniffer.js	Detecteert video- en audiostreams op webpagina's voor gemakkelijke toegang.
-Video-enhancer.js	Voegt extra controles en kwaliteitsverbeteringen toe aan videospelers.
+Script	Description
+Video-downloader.js	Download videos from various platforms. Now features a visual progress bar.
+Stream-sniffer.js	Detects video and audio streams on web pages for easy access.
+Video-enhancer.js	Adds extra controls and quality improvements to web video players.
 🔒 Privacy & Browsing
-Script	Omschrijving
-Privacy-enhance.js	Blokkeert bekende trackers en verwijdert tracking-parameters uit URL's.
-Darkmode.js	Dwingt een donker thema af op websites die dit zelf niet ondersteunen.
-Content-enhancer.js	Opschonen van pagina-indelingen voor een betere leeservaring.
-Module-blocker.js	Blokkeert specifieke scripts of modules die de site-ervaring vertragen.
-🛍️ Marktplaats
-Script	Omschrijving
-Marktplaats-us.js	Specifieke aanpassingen voor Marktplaats.nl (bijv. advertenties verbergen of lay-out fixes).
-⚙️ Core & Ontwikkeling
+Script	Description
+Privacy-enhance.js	Blocks known trackers and strips tracking parameters from URLs.
+Darkmode.js	Forces a dark theme on websites that do not natively support it.
+Content-enhancer.js	Cleans up page layouts for a better, distraction-free reading experience.
+Module-blocker.js	Blocks specific scripts or modules that slow down the site experience.
+🛍️ E-commerce / Local
+Script	Description
+Marktplaats-us.js	Specific tweaks for Marktplaats.nl (e.g., hiding ads or layout fixes).
+⚙️ Core & Development
 
-    WTA-core-module.js: De kernmodule die gedeelde functies bevat voor de video-tools.
+    WTA-core-module.js: The core module containing shared functions for the video-related tools.
 
-🛠️ Ontwikkeling & Structuur
+🛠️ Development & Structure
 
-De scripts in deze repository zijn geschreven in vanillia JavaScript.
+These scripts are written in vanilla JavaScript.
 
-    Besturingssysteem: Werkt op Windows, macOS en Linux (via de browser).
+    OS Compatibility: Works on Windows, macOS, and Linux via the browser.
 
-    Structuur: Georganiseerd op basis van functionaliteit voor makkelijk onderhoud.
+    Organization: Scripts are categorized by functionality for easier maintenance.
 
-📝 Recent toegevoegd
+📝 Recent Updates
 
-    Progress Bar: De video-downloader heeft nu visuele feedback tijdens het downloaden.
+    Progress Bar: Added visual feedback during downloads in the video-downloader.
 
-    Robustness: Verbeterde foutafhandeling in de stream-sniffer en core-modules.
+    Robustness: Improved error handling in the stream-sniffer and core modules.
